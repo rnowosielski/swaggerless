@@ -25,7 +25,7 @@ module Swaggerless
       swagger["securityDefinitions"].each do |securityDefinitionName, securityDefinition|
         if securityDefinition['x-amazon-apigateway-authorizer'] != nil then
           authorizer = securityDefinition['x-amazon-apigateway-authorizer-lambda']
-          securityDefinition['x-amazon-apigateway-authorizer']["authorizerUri"] = "arn:aws:apigateway:#{@region}:lambda:path/2015-03-31/functions/arn:aws:lambda:#{@region}:#{@account}:function:#{authorizer}:#{@function_alias}/invocations"
+          securityDefinition['x-amazon-apigateway-authorizer']["authorizerUri"] = "arn:aws:apigateway:#{@region}:lambda:path/2015-03-31/functions/arn:aws:lambda:#{@region}:#{@account}:function:#{authorizer}/invocations"
         end
       end
     end
@@ -46,19 +46,25 @@ module Swaggerless
     end
 
     def deploy_lambda(lambda_role_arn, function_name, summary, runtime, handler)
+      puts "Deploying #{function_name}"
       lambdaClient = Aws::Lambda::Client.new(region: @region)
       begin
         lambdaClient.get_alias({function_name: function_name, name: @function_alias})
       rescue Aws::Lambda::Errors::ResourceNotFoundException
         lambdaResponse = nil
-        zipFileContent = File.read(File.join(outputPath,"#{@function_alias}.zip"))
+        zipFileContent = File.read(File.join(@outputPath,"#{@function_alias}.zip"))
         begin
           lambdaClient.get_function({function_name: function_name})
           lambdaResponse = lambdaClient.update_function_code({function_name: function_name, zip_file: zipFileContent, publish: true})
         rescue Aws::Lambda::Errors::ResourceNotFoundException
+          puts "Creating new function #{function_name}"
           lambdaResponse = lambdaClient.create_function({function_name: function_name, runtime: runtime, role: lambda_role_arn, handler: handler, code: { zip_file: zipFileContent }, description: summary, publish: true})
         end
-        lambdaClient.create_alias({function_name: function_name, name: @function_alias, function_version: lambdaResponse.version, description: "Deployment of new version on " +  Time.now.inspect})
+        puts "Creating alias #{@function_alias}"
+        aliasResp = lambdaClient.create_alias({function_name: function_name, name: @function_alias, function_version: lambdaResponse.version, description: "Deployment of new version on " +  Time.now.inspect})
+        puts aliasResp.to_yaml
+        resp = lambdaClient.add_permission({function_name: aliasResp.alias_arn, statement_id: "API_2_#{function_name}_#{@function_alias}", action: "lambda:*", principal: 'apigateway.amazonaws.com'})
+        puts resp.to_yaml
       end
       return "arn:aws:apigateway:#{@region}:lambda:path/2015-03-31/functions/arn:aws:lambda:#{@region}:#{@account}:function:#{function_name}:#{@function_alias}/invocations"
     end
@@ -93,6 +99,7 @@ module Swaggerless
     end
 
     def create_api_gateway_deployment(lambda_role_arn, swagger)
+      puts "Creating API Gateway Deployment"
       deploy_lambdas_and_update_integration_uris(lambda_role_arn, swagger)
       update_authorizer_uri(swagger)
       apiId = self.create_api_gateway(swagger);
