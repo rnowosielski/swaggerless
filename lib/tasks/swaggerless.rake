@@ -26,7 +26,7 @@ task :deploy, [ :environment ] => [ :clean, :package ] do |t, args|
 
   swagger_content = File.read(@swaggerSpecFile)
   swagger = YAML.load(swagger_content)
-  Swaggerless::Deployer.new(@awsAccount, @awsRegion, args[:environment]).create_api_gateway_deployment(@lambdaRoleArn, swagger)
+  Swaggerless::Deployer.new(@awsAccount, @awsRegion, args[:environment].gsub(/[^a-zA-Z0-9_]/, "_")).create_api_gateway_deployment(@lambdaRoleArn, swagger)
 end
 
 desc 'Package the project for AWS Lambda'
