@@ -116,6 +116,10 @@ module Swaggerless
       apis = @api_gateway_client.get_rest_apis(limit: 500).data
       api = apis.items.select { |a| a.name == swagger['info']['title'] }.first
 
+      if swagger['basePath']
+        swagger['paths'] = Hash[swagger['paths'].map {|k, v| [ swagger['basePath'] + k, v ] }]
+      end
+
       if api
         resp = @api_gateway_client.put_rest_api({rest_api_id: api.id, mode: "overwrite", fail_on_warnings: true, body: swagger.to_yaml})
       else
