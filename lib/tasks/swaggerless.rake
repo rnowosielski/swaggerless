@@ -29,7 +29,7 @@ namespace :swaggerless do
     swagger_content = File.read(@swaggerSpecFile)
     swagger = YAML.load(swagger_content)
     ENV["apiUrl"] = Swaggerless::Deployer.new(@awsAccount, @awsRegion, args[:environment].gsub(/[^a-zA-Z0-9_]/, "_")).create_api_gateway_deployment(@lambdaRoleArn, swagger)
-    puts "Setting $apiUrl environment variable to point to the deployed API"
+    puts "Setting ENV[apiUrl] to point to the deployed API"
   end
 
   desc 'Package the project for AWS Lambda'
@@ -52,6 +52,13 @@ namespace :swaggerless do
   desc 'Clean'
   task :clean do
     FileUtils.rm_rf('output')
+  end
+
+  desc 'Clean AWS resources'
+  task :clean_aws_resources do
+    swagger_content = File.read(@swaggerSpecFile)
+    swagger = YAML.load(swagger_content)
+    Swaggerless::Cleaner.new(@awsAccount, @awsRegion).clean_unused_deployments(swagger)
   end
 
 end
