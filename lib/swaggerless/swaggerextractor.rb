@@ -9,7 +9,6 @@ module Swaggerless
 
   AMZ_APIGATEWAY_AUTHORIZER = 'x-amazon-apigateway-authorizer'
 
-  SWGR_OPERATION_ID = 'operationId'
   SWGR_SUMMARY = 'summary'
   SWGR_DESCRIPTION = 'description'
 
@@ -19,35 +18,30 @@ module Swaggerless
       lambdas_map = Hash.new
       swagger["paths"].each do |path, path_config|
         path_config.each do |method, method_config|
-          if lambdas_map[method_config[EXT_LAMBDA_NAME]] then
-            stored_version = lambdas_map[method_config[EXT_LAMBDA_NAME]];
-            encountered_version = build_lambda_config_hash(method_config)
-            fill_in_config_gaps(stored_version, encountered_version)
-            unless is_lambda_config_correct(stored_version, encountered_version)
-              raise "Lambda #{method_config[EXT_LAMBDA_NAME]} mentioned multiple times in configuration with different settings"
-            end
-            lambdas_map[method_config[EXT_LAMBDA_NAME]][:description] = 'Part of ' + Deployer.get_service_prefix(swagger)
-          elsif method_config[EXT_LAMBDA_NAME]
-            lambdas_map[method_config[EXT_LAMBDA_NAME]] = build_lambda_config_hash(method_config)
-          end
+          process_lambda_config(lambdas_map, method_config, swagger)
         end
       end
 
       swagger["securityDefinitions"].each do |securityDefinitionName, securityDefinition|
         if securityDefinition[AMZ_APIGATEWAY_AUTHORIZER] != nil
-          if lambdas_map[securityDefinition[EXT_LAMBDA_NAME]]
-            stored_version = lambdas_map[securityDefinition[AMZ_APIGATEWAY_AUTHORIZER][EXT_LAMBDA_NAME]];
-            encountered_version = build_lambda_config_hash(securityDefinition[AMZ_APIGATEWAY_AUTHORIZER])
-            unless is_lambda_config_correct(stored_version, encountered_version)
-              raise "Lambda #{method_config[EXT_LAMBDA_NAME]} mentioned multiple times in configuration with different settings"
-            end
-            lambdas_map[securityDefinition[EXT_LAMBDA_NAME]][:description] = 'Part of ' + Deployer.get_service_prefix(swagger)
-          else
-            lambdas_map[securityDefinition[EXT_LAMBDA_NAME]] = build_lambda_config_hash(securityDefinition)
-          end
+          process_lambda_config(lambdas_map, securityDefinition, swagger)
         end
       end
       return lambdas_map
+    end
+
+    def process_lambda_config(lambdas_map, objContainingLambdaConfig, swagger)
+      if lambdas_map[objContainingLambdaConfig[EXT_LAMBDA_NAME]]
+        stored_version = lambdas_map[objContainingLambdaConfig[EXT_LAMBDA_NAME]];
+        encountered_version = build_lambda_config_hash(objContainingLambdaConfig)
+        fill_in_config_gaps(stored_version, encountered_version)
+        unless is_lambda_config_correct(stored_version, encountered_version)
+          raise "Lambda #{objContainingLambdaConfig[EXT_LAMBDA_NAME]} mentioned multiple times in configuration with different settings"
+        end
+        lambdas_map[objContainingLambdaConfig[EXT_LAMBDA_NAME]][:description] = 'Part of ' + Deployer.get_service_prefix(swagger)
+      elsif objContainingLambdaConfig[EXT_LAMBDA_NAME]
+        lambdas_map[objContainingLambdaConfig[EXT_LAMBDA_NAME]] = build_lambda_config_hash(objContainingLambdaConfig)
+      end
     end
 
     private
@@ -59,6 +53,8 @@ module Swaggerless
     end
 
     def is_lambda_config_correct(l1, l2)
+      fill_in_config_gaps(l2,l1)
+      fill_in_config_gaps(l1,l2)
       return (l1[:handler] == l2[:handler] and
           l1[:timeout] == l2[:timeout] and
           l1[:runtime] == l2[:runtime])
