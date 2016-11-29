@@ -26,8 +26,8 @@ module Swaggerless
         response = @api_gateway_client.get_deployments({rest_api_id: api.id, limit: 500})
         time_threshold = Time.now
         response.items.each do |deployment|
-          puts "Deployment #{deployment.id} is not used and old enough to be pruned"
           if used_deployments[deployment.id] == nil and Time.at(deployment.created_date) < time_threshold
+            puts "Deployment #{deployment.id} is not used and old enough to be pruned"
             @api_gateway_client.delete_deployment({rest_api_id: api.id, deployment_id: deployment.id})
           end
         end
@@ -46,25 +46,30 @@ module Swaggerless
         configured_lambdas = @swaggerExtractor.get_lambda_map(swagger)
         configured_lambdas.each do |functionName, value|
           lambda_versions_used = Hash.new
-          resp = @lambda_client.list_aliases({function_name: functionName, max_items: 500 })
-          resp.aliases.each do |funcAlias|
-            if lambda_liases_used[funcAlias.name] == nil then
-              puts "Deleting alias #{funcAlias.name} for lambda function #{functionName}"
-              @lambda_client.delete_alias({function_name: functionName, name: funcAlias.name})
-            else
-              puts "Lambda version #{funcAlias.function_version} still used by function deployment #{functionName}"
-              lambda_versions_used[funcAlias.function_version] = funcAlias.name
+
+          begin
+            resp = @lambda_client.list_aliases({function_name: functionName, max_items: 500 })
+            resp.aliases.each do |funcAlias|
+              if lambda_liases_used[funcAlias.name] == nil then
+                puts "Deleting alias #{funcAlias.name} for lambda function #{functionName}"
+                @lambda_client.delete_alias({function_name: functionName, name: funcAlias.name})
+              else
+                puts "Lambda version #{funcAlias.function_version} still used by function deployment #{functionName}"
+                lambda_versions_used[funcAlias.function_version] = funcAlias.name
+              end
+
             end
 
-          end
+            resp = @lambda_client.list_versions_by_function({function_name: functionName, max_items: 500})
+            resp.versions.each do |lambda|
+              if lambda.version != "$LATEST" and lambda_versions_used[lambda.version] == nil
+                puts "Deleting lambda version #{lambda.version} of function #{functionName}"
+                @lambda_client.delete_function({function_name: functionName, qualifier: lambda.version})
+              end
 
-          resp = @lambda_client.list_versions_by_function({function_name: functionName, max_items: 500})
-          resp.versions.each do |lambda|
-            if lambda.version != "$LATEST" and lambda_versions_used[lambda.version] == nil
-              puts "Deleting lambda version #{lambda.version} of function #{functionName}"
-              @lambda_client.delete_function({function_name: functionName, qualifier: lambda.version})
             end
-
+          rescue Aws::Lambda::Errors::ResourceNotFoundException
+            puts "Function #{functionName} does not exist and will be skipped"
           end
 
         end
