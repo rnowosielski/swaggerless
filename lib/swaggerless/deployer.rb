@@ -162,6 +162,12 @@ module Swaggerless
         swagger['paths'] = Hash[swagger['paths'].map {|k, v| [ swagger['basePath'] + k, v ] }]
       end
 
+      swagger["definitions"].each do |key, value|
+        if (value.key?("example")) then
+          value.delete("example")
+        end
+      end
+
       if api
         resp = @api_gateway_client.put_rest_api({rest_api_id: api.id, mode: "overwrite", fail_on_warnings: true, body: swagger.to_yaml})
       else
