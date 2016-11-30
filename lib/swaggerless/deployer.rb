@@ -13,8 +13,8 @@ module Swaggerless
       @output_path = 'output'
       @verbose = false;
       @function_alias = get_current_package_alias
-      @swaggerExtractor = Swaggerless::SwaggerExtractor.new();
-      @cloudwatch_client = Aws::CloudWatchLogs::Client.new();
+      @swaggerExtractor = Swaggerless::SwaggerExtractor.new()
+      @cloudwatch_client = Aws::CloudWatchLogs::Client.new(region: @region)
       @lambda_client = Aws::Lambda::Client.new(region: @region)
     end
 
