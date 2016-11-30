@@ -12,6 +12,12 @@ module Swaggerless
       @swaggerExtractor = Swaggerless::SwaggerExtractor.new();
     end
 
+    def remove_stage(swagger, stage_to_remove)
+      apis = @api_gateway_client.get_rest_apis(limit: 500).data
+      api = apis.items.select { |a| a.name == swagger['info']['title'] }.first
+      @api_gateway_client.delete_stage({rest_api_id: api.id, stage_name: stage_to_remove})
+    end
+
     def clean_unused_deployments(swagger)
       apis = @api_gateway_client.get_rest_apis(limit: 500).data
       api = apis.items.select { |a| a.name == swagger['info']['title'] }.first
@@ -44,9 +50,11 @@ module Swaggerless
         end
 
         configured_lambdas = @swaggerExtractor.get_lambda_map(swagger)
-        configured_lambdas.each do |functionName, value|
+        configured_lambdas.each do |functionName, config|
           lambda_versions_used = Hash.new
-
+          if config[:handler] == nil
+            next
+          end
           begin
             resp = @lambda_client.list_aliases({function_name: functionName, max_items: 500 })
             resp.aliases.each do |funcAlias|

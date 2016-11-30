@@ -1,4 +1,5 @@
 require "aws-sdk"
+require 'digest/sha1'
 
 module Swaggerless
 
@@ -13,6 +14,7 @@ module Swaggerless
       @verbose = false;
       @function_alias = get_current_package_alias
       @swaggerExtractor = Swaggerless::SwaggerExtractor.new();
+      @cloudwatch_client = Aws::CloudWatchLogs::Client.new();
       @lambda_client = Aws::Lambda::Client.new(region: @region)
     end
 
@@ -25,14 +27,15 @@ module Swaggerless
     end
 
     def deploy_authoirizers_and_update_authorizers_uri(lambda_role_arn, swagger)
+      lambdas_configs = @swaggerExtractor.get_lambda_map(swagger)
       swagger["securityDefinitions"].each do |securityDefinitionName, securityDefinition|
         if securityDefinition[AMZ_APIGATEWAY_AUTHORIZER] != nil then
           authorizer = securityDefinition[EXT_LAMBDA_NAME]
-          if securityDefinition[EXT_LAMBDA_NAME] then
-            securityDefinition[AMZ_APIGATEWAY_AUTHORIZER]["authorizerUri"] = deploy_lambda(lambda_role_arn, securityDefinition[EXT_LAMBDA_NAME],
-              "Authorizer for #{swagger["info"]["title"]}", securityDefinition[EXT_LAMBDA_RUNTIME], securityDefinition[EXT_LAMBDA_HANDLER],
-                                                                                           securityDefinition[EXT_LAMBDA_TIMEOUT])
-          else
+          if securityDefinition[EXT_LAMBDA_NAME] and securityDefinition[EXT_LAMBDA_HANDLER] then
+            config = lambdas_configs[securityDefinition[EXT_LAMBDA_NAME]]
+            securityDefinition[AMZ_APIGATEWAY_AUTHORIZER]["authorizerUri"] =
+                deploy_lambda_and_attach_log_forwarder(lambda_role_arn, securityDefinition, config)
+          elsif securityDefinition[EXT_LAMBDA_NAME]
             securityDefinition[AMZ_APIGATEWAY_AUTHORIZER]["authorizerUri"] = "arn:aws:apigateway:#{@region}:lambda:path/2015-03-31/functions/arn:aws:lambda:#{@region}:#{@account}:function:#{authorizer}/invocations"
           end
           policy_exists = false
@@ -59,8 +62,8 @@ module Swaggerless
           if method_config[EXT_LAMBDA_HANDLER] then
             if deployed_operations[method_config[EXT_LAMBDA_NAME]] == nil
               config = lambdas_configs[method_config[EXT_LAMBDA_NAME]]
-              deployed_operations[method_config[EXT_LAMBDA_NAME]] = deploy_lambda(lambda_role_arn, method_config[EXT_LAMBDA_NAME], config[:description],
-                config[:runtime], config[:handler], config[:timeout])
+              deployed_operations[method_config[EXT_LAMBDA_NAME]] =
+                  deploy_lambda_and_attach_log_forwarder(lambda_role_arn, method_config, config)
             end
             puts "Updating swagger with integration uri for #{method} #{path}: #{deployed_operations[method_config[EXT_LAMBDA_NAME]]}" unless not @verbose
             method_config['x-amazon-apigateway-integration']['uri'] = deployed_operations[method_config[EXT_LAMBDA_NAME]]
@@ -74,6 +77,45 @@ module Swaggerless
             end
           end
         end
+      end
+    end
+
+    def deploy_lambda_and_attach_log_forwarder(lambda_role_arn, lambda_obj, config)
+      lambda_arn = deploy_lambda(lambda_role_arn, lambda_obj[EXT_LAMBDA_NAME], config[:description], config[:runtime], config[:handler], config[:timeout])
+      if config[:log_forwarder]
+        attach_log_forwarder(lambda_obj[EXT_LAMBDA_NAME], config[:log_forwarder])
+      end
+      return lambda_arn
+    end
+
+    def attach_log_forwarder(lambda_name, log_forwarder)
+      permissionStatementId = Digest::SHA1.hexdigest "logs_#{lambda_name}_to_#{log_forwarder}"
+      begin
+        @lambda_client.remove_permission({function_name: "arn:aws:lambda:#{@region}:#{@account}:function:#{log_forwarder}",
+          statement_id: permissionStatementId})
+      rescue Aws::Lambda::Errors::ResourceNotFoundException => e
+      end
+
+      @lambda_client.add_permission({function_name: "arn:aws:lambda:#{@region}:#{@account}:function:#{log_forwarder}",
+        statement_id: permissionStatementId,
+        action: "lambda:InvokeFunction",
+        principal: "logs.#{@region}.amazonaws.com", source_arn: "arn:aws:logs:#{@region}:#{@account}:log-group:/aws/lambda/#{lambda_name}:*",
+        source_account: "#{@account}" })
+
+      begin
+        resp = @cloudwatch_client.describe_log_groups({ log_group_name_prefix: "/aws/lambda/#{lambda_name}", limit: 1 })
+        if resp.log_groups.length == 0
+          @cloudwatch_client.create_log_group({log_group_name: "/aws/lambda/#{lambda_name}"})
+        end
+        resp = @cloudwatch_client.describe_subscription_filters({log_group_name: "/aws/lambda/#{lambda_name}"})
+        if resp.subscription_filters.length > 0
+          resp.subscription_filters.each do |filter|
+          @cloudwatch_client.delete_subscription_filter({log_group_name: "/aws/lambda/#{lambda_name}", filter_name: filter.filter_name})
+          end
+        end
+        @cloudwatch_client.put_subscription_filter({ log_group_name: "/aws/lambda/#{lambda_name}",
+          filter_name: log_forwarder, filter_pattern: '',
+          destination_arn: "arn:aws:lambda:#{@region}:#{@account}:function:#{log_forwarder}"})
       end
     end
 

@@ -61,4 +61,15 @@ namespace :swaggerless do
     Swaggerless::Cleaner.new(@awsAccount, @awsRegion).clean_unused_deployments(swagger)
   end
 
+  task :delete_stage, [ :environment ] => [ :clean ] do |t, args|
+    swagger_content = File.read(@swaggerSpecFile)
+    swagger = YAML.load(swagger_content)
+    Swaggerless::Cleaner.new(@awsAccount, @awsRegion).remove_stage(swagger, args[:environment].gsub(/[^a-zA-Z0-9_]/, "_"))
+  end
+
+  desc 'Remove stage and cleanup'
+  task :delete, [ :environment ] => [ :clean, :delete_stage, :clean_aws_resources ] do |t, args|
+  end
+
+
 end

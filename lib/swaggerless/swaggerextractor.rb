@@ -6,6 +6,7 @@ module Swaggerless
   EXT_LAMBDA_HANDLER = 'x-amazon-lambda-handler'
   EXT_LAMBDA_TIMEOUT = 'x-amazon-lambda-timeout'
   EXT_LAMBDA_RUNTIME = 'x-amazon-lambda-runtime'
+  EXT_LAMBDA_LOG_FORWARDER = 'x-amazon-lambda-log-forwarder'
 
   AMZ_APIGATEWAY_AUTHORIZER = 'x-amazon-apigateway-authorizer'
 
@@ -50,6 +51,7 @@ module Swaggerless
       if to[:handler] == nil then to[:handler] = from[:handler] end
       if to[:timeout] == nil then to[:timeout] = from[:timeout] end
       if to[:runtime] == nil then to[:runtime] = from[:runtime] end
+      if to[:log_forwarder] == nil then to[:log_forwarder] = from[:log_forwarder] end
     end
 
     def is_lambda_config_correct(l1, l2)
@@ -57,14 +59,16 @@ module Swaggerless
       fill_in_config_gaps(l1,l2)
       return (l1[:handler] == l2[:handler] and
           l1[:timeout] == l2[:timeout] and
-          l1[:runtime] == l2[:runtime])
+          l1[:runtime] == l2[:runtime] and
+          l1[:log_forwarder] == l2[:log_forwarder])
     end
 
     def build_lambda_config_hash(method_config)
       { handler: method_config[EXT_LAMBDA_HANDLER],
         timeout: method_config[EXT_LAMBDA_TIMEOUT],
         runtime: method_config[EXT_LAMBDA_RUNTIME],
-        description: method_config[SWGR_SUMMARY] || method_config[SWGR_DESCRIPTION]}
+        description: method_config[SWGR_SUMMARY] || method_config[SWGR_DESCRIPTION],
+        log_forwarder: method_config[EXT_LAMBDA_LOG_FORWARDER]}
     end
 
   end
