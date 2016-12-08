@@ -39,16 +39,17 @@ module Swaggerless
             securityDefinition[AMZ_APIGATEWAY_AUTHORIZER]["authorizerUri"] = "arn:aws:apigateway:#{@region}:lambda:path/2015-03-31/functions/arn:aws:lambda:#{@region}:#{@account}:function:#{authorizer}/invocations"
           end
           policy_exists = false
+          policy_name = "API_2_#{authorizer}".gsub(":","_")
           begin
             existing_policies = @lambda_client.get_policy(function_name: authorizer).data
             existing_policy = JSON.parse(existing_policies.policy)
-            policy_exists = existing_policy['Statement'].select { |s| s['Sid'] == "API_2_#{authorizer}" }.any?
+            policy_exists = existing_policy['Statement'].select { |s| s['Sid'] == policy_name }.any?
           rescue Aws::Lambda::Errors::ResourceNotFoundException
             policy_exists = false
           end
           unless policy_exists
             @lambda_client.add_permission({function_name: "arn:aws:lambda:#{@region}:#{@account}:function:#{authorizer}",
-                                          statement_id: "API_2_#{authorizer}", action: "lambda:*", principal: 'apigateway.amazonaws.com'})
+              statement_id: policy_name, action: "lambda:*", principal: 'apigateway.amazonaws.com'})
           end
         end
       end
