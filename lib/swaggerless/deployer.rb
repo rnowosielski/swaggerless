@@ -124,6 +124,7 @@ module Swaggerless
       puts "Deploying #{function_name}"
       runtime ||= 'nodejs4.3'
       timeout ||= 5
+      permissionStatementId = Digest::SHA1.hexdigest "API_2_#{function_name}_#{@function_alias}"
       begin
         @lambda_client.get_alias({function_name: function_name, name: @function_alias})
       rescue Aws::Lambda::Errors::ResourceNotFoundException
@@ -139,7 +140,7 @@ module Swaggerless
         end
         puts "Creating alias #{@function_alias}"
         alias_resp = @lambda_client.create_alias({function_name: function_name, name: @function_alias, function_version: lambda_response.version, description: "Deployment of new version on " +  Time.now.inspect})
-        @lambda_client.add_permission({function_name: alias_resp.alias_arn, statement_id: "API_2_#{function_name}_#{@function_alias}", action: "lambda:*", principal: 'apigateway.amazonaws.com'})
+        @lambda_client.add_permission({function_name: alias_resp.alias_arn, statement_id: permissionStatementId, action: "lambda:*", principal: 'apigateway.amazonaws.com'})
       end
       return "arn:aws:apigateway:#{@region}:lambda:path/2015-03-31/functions/arn:aws:lambda:#{@region}:#{@account}:function:#{function_name}:#{@function_alias}/invocations"
     end
