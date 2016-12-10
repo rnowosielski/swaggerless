@@ -197,8 +197,8 @@ module Swaggerless
           puts "API available at #{url}"
           return url;
         rescue Aws::APIGateway::Errors::TooManyRequestsException => e
-          STDERR.puts 'WARNING: Got TooManyRequests response from API Gateway. Waiting for a second.'
-          sleep(1)
+          STDERR.puts 'WARNING: Got TooManyRequests response from API Gateway. Waiting...'
+          sleep(5)
         end
       end
 
