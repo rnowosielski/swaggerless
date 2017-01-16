@@ -22,10 +22,11 @@ module Swaggerless
           process_lambda_config(lambdas_map, method_config, swagger)
         end
       end
-
-      swagger["securityDefinitions"].each do |securityDefinitionName, securityDefinition|
-        if securityDefinition[AMZ_APIGATEWAY_AUTHORIZER] != nil
-          process_lambda_config(lambdas_map, securityDefinition, swagger)
+      if swagger.key?("securityDefinitions") then
+        swagger["securityDefinitions"].each do |securityDefinitionName, securityDefinition|
+          if securityDefinition[AMZ_APIGATEWAY_AUTHORIZER] != nil
+            process_lambda_config(lambdas_map, securityDefinition, swagger)
+          end
         end
       end
       return lambdas_map

@@ -28,28 +28,30 @@ module Swaggerless
 
     def deploy_authoirizers_and_update_authorizers_uri(lambda_role_arn, swagger)
       lambdas_configs = @swaggerExtractor.get_lambda_map(swagger)
-      swagger["securityDefinitions"].each do |securityDefinitionName, securityDefinition|
-        if securityDefinition[AMZ_APIGATEWAY_AUTHORIZER] != nil then
-          authorizer = securityDefinition[EXT_LAMBDA_NAME]
-          if securityDefinition[EXT_LAMBDA_NAME] and securityDefinition[EXT_LAMBDA_HANDLER] then
-            config = lambdas_configs[securityDefinition[EXT_LAMBDA_NAME]]
-            securityDefinition[AMZ_APIGATEWAY_AUTHORIZER]["authorizerUri"] =
-                deploy_lambda_and_attach_log_forwarder(lambda_role_arn, securityDefinition, config)
-          elsif securityDefinition[EXT_LAMBDA_NAME]
-            securityDefinition[AMZ_APIGATEWAY_AUTHORIZER]["authorizerUri"] = "arn:aws:apigateway:#{@region}:lambda:path/2015-03-31/functions/arn:aws:lambda:#{@region}:#{@account}:function:#{authorizer}/invocations"
-          end
-          policy_exists = false
-          policy_name = "API_2_#{authorizer}".gsub(":","_")
-          begin
-            existing_policies = @lambda_client.get_policy(function_name: authorizer).data
-            existing_policy = JSON.parse(existing_policies.policy)
-            policy_exists = existing_policy['Statement'].select { |s| s['Sid'] == policy_name }.any?
-          rescue Aws::Lambda::Errors::ResourceNotFoundException
+      if swagger.key?("securityDefinitions") then
+        swagger["securityDefinitions"].each do |securityDefinitionName, securityDefinition|
+          if securityDefinition[AMZ_APIGATEWAY_AUTHORIZER] != nil then
+            authorizer = securityDefinition[EXT_LAMBDA_NAME]
+            if securityDefinition[EXT_LAMBDA_NAME] and securityDefinition[EXT_LAMBDA_HANDLER] then
+              config = lambdas_configs[securityDefinition[EXT_LAMBDA_NAME]]
+              securityDefinition[AMZ_APIGATEWAY_AUTHORIZER]["authorizerUri"] =
+                  deploy_lambda_and_attach_log_forwarder(lambda_role_arn, securityDefinition, config)
+            elsif securityDefinition[EXT_LAMBDA_NAME]
+              securityDefinition[AMZ_APIGATEWAY_AUTHORIZER]["authorizerUri"] = "arn:aws:apigateway:#{@region}:lambda:path/2015-03-31/functions/arn:aws:lambda:#{@region}:#{@account}:function:#{authorizer}/invocations"
+            end
             policy_exists = false
-          end
-          unless policy_exists
-            @lambda_client.add_permission({function_name: "arn:aws:lambda:#{@region}:#{@account}:function:#{authorizer}",
-              statement_id: policy_name, action: "lambda:*", principal: 'apigateway.amazonaws.com'})
+            policy_name = "API_2_#{authorizer}".gsub(":","_")
+            begin
+              existing_policies = @lambda_client.get_policy(function_name: authorizer).data
+              existing_policy = JSON.parse(existing_policies.policy)
+              policy_exists = existing_policy['Statement'].select { |s| s['Sid'] == policy_name }.any?
+            rescue Aws::Lambda::Errors::ResourceNotFoundException
+              policy_exists = false
+            end
+            unless policy_exists
+              @lambda_client.add_permission({function_name: "arn:aws:lambda:#{@region}:#{@account}:function:#{authorizer}",
+                statement_id: policy_name, action: "lambda:*", principal: 'apigateway.amazonaws.com'})
+            end
           end
         end
       end

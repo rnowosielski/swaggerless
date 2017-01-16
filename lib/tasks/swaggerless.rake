@@ -38,6 +38,11 @@ namespace :swaggerless do
 
     FileUtils.mkdir_p 'output'
 
+    if not @swaggerSpecFile then
+      @swaggerSpecFile = 'swagger.yaml'
+      STDERR.puts("Swagger file not configured. Trying default ('#{@swaggerSpecFile}'). Set @swaggerSpecFile to point to swagger yaml file if you use different file name")
+    end
+
     if not @packageDir then
       @packageDir = 'src'
       STDERR.puts("Package directory not configured. Trying default ('#{@packageDir}'). Set @packageDir to point to the directory that should be packaged for AWS Lambda")
