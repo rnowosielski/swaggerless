@@ -6,16 +6,27 @@ module Swaggerless
   class Packager
 
     def initialize(input_dir, output_file)
-      @input_dir = input_dir
-      @output_file = output_file
+      @input_dir = File.expand_path(input_dir);
+      @output_file = File.expand_path(output_file);
     end
 
     def write
       version_hash = version_hash()
-      entries = Dir.entries(@input_dir) - %w(. ..)
 
-      ::Zip::File.open("#{@output_file}_#{version_hash}.zip", ::Zip::File::CREATE) do |io|
-        write_entries entries, '', io
+      zip_succeeded = false;
+      Dir.chdir(@input_dir) do
+        # There seems to be a bug that I can't hunt down. Binary files don't package well, therefore falling back to
+        # sytem zip - it does the job better. Will fix this in the future.
+        zip_succeeded = system("zip -r #{@output_file}_#{version_hash}.zip * > /dev/null");
+      end
+
+      if !zip_succeeded then
+        puts "Falling back to own implementation of packaging"
+        entries = Dir.entries(@input_dir) - %w(. ..)
+
+        ::Zip::File.open("#{@output_file}_#{version_hash}.zip", ::Zip::File::CREATE) do |io|
+          write_entries entries, '', io
+        end
       end
     end
 

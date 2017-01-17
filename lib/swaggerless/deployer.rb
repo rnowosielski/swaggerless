@@ -166,9 +166,11 @@ module Swaggerless
         swagger['paths'] = Hash[swagger['paths'].map {|k, v| [ swagger['basePath'] + k, v ] }]
       end
 
-      swagger["definitions"].each do |key, value|
-        if (value.key?("example")) then
-          value.delete("example")
+      if (swagger.key?("definitions")) then
+        swagger["definitions"].each do |key, value|
+          if (value.key?("example")) then
+            value.delete("example")
+          end
         end
       end
 
