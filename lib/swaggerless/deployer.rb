@@ -96,7 +96,7 @@ module Swaggerless
       begin
         @lambda_client.remove_permission({function_name: "arn:aws:lambda:#{@region}:#{@account}:function:#{log_forwarder}",
           statement_id: permissionStatementId})
-      rescue Aws::Lambda::Errors::ResourceNotFoundException => e
+      rescue Aws::Lambda::Errors::ResourceNotFoundException
       end
 
       @lambda_client.add_permission({function_name: "arn:aws:lambda:#{@region}:#{@account}:function:#{log_forwarder}",
@@ -200,7 +200,7 @@ module Swaggerless
           url = "https://#{api_id}.execute-api.#{@region}.amazonaws.com/#{@env}/"
           puts "API available at #{url}"
           return url;
-        rescue Aws::APIGateway::Errors::TooManyRequestsException => e
+        rescue Aws::APIGateway::Errors::TooManyRequestsException
           STDERR.puts 'WARNING: Got TooManyRequests response from API Gateway. Waiting...'
           sleep(5)
         end
