@@ -11,6 +11,7 @@ module Swaggerless
   AMZ_APIGATEWAY_AUTHORIZER = 'x-amazon-apigateway-authorizer'
 
   SWGR_SUMMARY = 'summary'
+  SWGR_AUTH_TYPE = 'type'
   SWGR_DESCRIPTION = 'description'
 
   class SwaggerExtractor

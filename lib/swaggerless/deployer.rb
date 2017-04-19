@@ -39,6 +39,7 @@ module Swaggerless
             elsif securityDefinition[EXT_LAMBDA_NAME]
               securityDefinition[AMZ_APIGATEWAY_AUTHORIZER]["authorizerUri"] = "arn:aws:apigateway:#{@region}:lambda:path/2015-03-31/functions/arn:aws:lambda:#{@region}:#{@account}:function:#{authorizer}/invocations"
             end
+            securityDefinition[SWGR_AUTH_TYPE] = 'apiKey'
             policy_exists = false
             policy_name = "API_2_#{authorizer}".gsub(":","_")
             begin
