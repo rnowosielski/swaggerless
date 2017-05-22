@@ -41,11 +41,13 @@ module Swaggerless
         response = @api_gateway_client.get_deployments({rest_api_id: api.id, limit: 500})
         lambda_liases_used = Hash.new
         response.items.each do |deployment|
-          first_char = deployment.description.rindex(":")
-          if first_char
-            func_alias = deployment.description[deployment.description.rindex(":")+2..-1]
-            puts "Lambda alias #{func_alias} still used by deployment #{deployment.id}"
-            lambda_liases_used[func_alias] = deployment.id
+          if deployment.description != nil then
+            first_char = deployment.description.rindex(":")
+            if first_char
+              func_alias = deployment.description[deployment.description.rindex(":")+2..-1]
+              puts "Lambda alias #{func_alias} still used by deployment #{deployment.id}"
+              lambda_liases_used[func_alias] = deployment.id
+            end
           end
         end
 
