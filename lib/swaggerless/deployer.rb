@@ -136,10 +136,19 @@ module Swaggerless
         begin
           @lambda_client.get_function({function_name: function_name})
           lambda_response = @lambda_client.update_function_code({function_name: function_name, zip_file: zip_file_content, publish: true})
+          puts "Lambda function code update started. Waiting for Lambda to enter 'last update complete' state before continuing with deployment."
+          @lambda_client.wait_until(:function_updated, {function_name: function_name}) do |waiter|
+            waiter.before_attempt do |attempts|
+              puts "#{attempts} status checks made on Lambda, about to perform check #{attempts + 1}..."
+            end
+          end
+          puts "Lambda function code update complete!"
           @lambda_client.update_function_configuration({function_name: function_name, runtime: runtime, role: lambda_role_arn, handler: handler, description: summary, timeout: timeout})
         rescue Aws::Lambda::Errors::ResourceNotFoundException
           puts "Creating new function #{function_name}"
           lambda_response = @lambda_client.create_function({function_name: function_name, runtime: runtime, role: lambda_role_arn, handler: handler, code: {zip_file: zip_file_content }, description: summary, publish: true, timeout: timeout})
+        rescue Aws::Waiters::Errors::WaiterFailed
+          raise "Lambda did not enter the 'last update complete' state within the allowed number of status checks. Unable to continue."
         end
         puts "Creating alias #{@function_alias}"
         alias_resp = @lambda_client.create_alias({function_name: function_name, name: @function_alias, function_version: lambda_response.version, description: "Deployment of new version on " +  Time.now.inspect})
